@@ -29,7 +29,7 @@ textarea{min-height:70px;resize:vertical}
 .pop button{display:block;width:100%;text-align:left;border:0;background:none;padding:9px 12px;border-radius:7px;font:inherit;cursor:pointer}.pop button:hover{background:var(--o2)}
 .err{color:#b3261e;background:#fdecea;border-radius:9px;padding:9px 12px;margin-top:10px;font-size:13px;white-space:pre-wrap}
 .ok{background:var(--o2);border-radius:9px;padding:10px;margin-top:10px;font-size:13.5px;white-space:pre-wrap}.hint{font-size:12px;color:var(--mu)}
-.empty{color:var(--mu);text-align:center;padding:90px 20px}.fig{border-top:1px solid var(--bd);padding:14px}.fc{border:1px solid var(--bd);border-radius:10px;padding:10px;margin-top:10px}.fc svg{max-width:100%;height:auto;background:#fff;border-radius:6px;margin-top:6px}
+.empty{color:var(--mu);text-align:center;padding:90px 20px}.figi{text-align:center;margin:10px 0;white-space:normal}.figi svg{max-width:100%;height:auto;background:#fff}.figi button{border:1px solid var(--bd);background:var(--o2);color:var(--o5);border-radius:8px;padding:4px 10px;margin:4px 3px 0;cursor:pointer;font:13px "Segoe UI",sans-serif}.fig{border-top:1px solid var(--bd);padding:14px}.fc{border:1px solid var(--bd);border-radius:10px;padding:10px;margin-top:10px}.fc svg{max-width:100%;height:auto;background:#fff;border-radius:6px;margin-top:6px}
 </style></head><body>
 <header><h1>📐 Ra đề kiểm tra Toán theo ma trận &amp; đặc tả</h1><p>Kiểm tra định kì · 90 phút · Công thức viết trong $...$ để chuyển sang MathType</p></header>
 <main><section>
@@ -131,26 +131,33 @@ $("rd").onclick=async()=>{$("err").innerHTML="";$("sum").innerHTML="";
 let R=[],cur=0,view="ĐỀ THI",ctl=null;
 function parse(raw){const o={};const re=/===\s*(NGUỒN|ĐỀ THI|HƯỚNG DẪN)\s*===/g;let m,l=null,i=0;while((m=re.exec(raw))){if(l)o[l]=raw.slice(i,m.index).trim();l=m[1];i=re.lastIndex}if(l)o[l]=raw.slice(i).trim();else o["ĐỀ THI"]=raw;return o}
 const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-function show(){const o=$("out");if(o)o.textContent=parse(R[cur]?R[cur].raw:"")[view]||"(chưa có nội dung...)"}
+function show(){const o=$("out");if(!o)return;const t=parse(R[cur]?R[cur].raw:"")[view]||"(chưa có nội dung...)";if(view!=="ĐỀ THI"){o.textContent=t;return}
+ let i=0;const L=figList();o.innerHTML=esc(t).replace(/\[HÌNH\s*([^:\]]*):\s*([^\]]+)\]/g,(m,n,d)=>{const k=i++,f=L[k],sv=f&&FIG[f.id];
+  return `<div class="figi">${sv?sv+`<div><button onclick="figGen(${k})">🔄 Vẽ lại</button><button onclick="figSave(${k},'png')">⬇ PNG</button><button onclick="figSave(${k},'svg')">⬇ SVG</button></div>`:`<span class="hint">[HÌNH ${n.trim()}: ${d}]</span><br><button onclick="figGen(${k})">🎨 Vẽ hình</button>`}<div id="fs_${k}" class="hint"></div></div>`})}
 function frame(){const t=R.length>1?R.map((_,i)=>`<button class="tab ${i==cur?"on":""}" onclick="cur=${i};frame()">Đề ${i+1}</button>`).join(""):"";
  const v=["ĐỀ THI","HƯỚNG DẪN","NGUỒN"].map(x=>`<button class="tab ${x==view?"on":""}" onclick="view='${x}';frame()">${x=="NGUỒN"?"Nguồn":x=="ĐỀ THI"?"Đề thi":"Hướng dẫn giải / chấm"}</button>`).join("");
- $("res").innerHTML=`${t?`<div class="tabs">${t}</div>`:""}<div class="sub"><div class="row" style="flex:none;gap:6px">${v}</div><details class="menu"><summary class="btn">⬇ Xuất / Sao chép ▾</summary><div class="pop"><button onclick="exp('ĐỀ THI')">📄 Tải Word: Đề thi</button><button onclick="exp('HƯỚNG DẪN')">📄 Tải Word: Hướng dẫn</button><button onclick="cp()">📋 Sao chép phần đang xem</button></div></details></div><div id="out"></div><div id="figs"></div>`;show();figs()}
+ $("res").innerHTML=`${t?`<div class="tabs">${t}</div>`:""}<div class="sub"><div class="row" style="flex:none;gap:6px">${v}</div><details class="menu"><summary class="btn">⬇ Xuất / Sao chép ▾</summary><div class="pop"><button onclick="exp('ĐỀ THI')">📄 Tải Word: Đề thi</button><button onclick="exp('HƯỚNG DẪN')">📄 Tải Word: Hướng dẫn</button><button onclick="cp()">📋 Sao chép phần đang xem</button></div></details></div><div id="out"></div>`;show()}
 function cp(){navigator.clipboard.writeText(parse(R[cur].raw)[view]||"").then(()=>alert("Đã sao chép (công thức giữ nguyên trong $...$)."))}
-function exp(w){const t=parse(R[cur].raw)[w]||"",h=esc(t).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").split("\n").map(l=>`<p style="margin:3pt 0">${l||"&nbsp;"}</p>`).join("");
- const b=new Blob(["\ufeff<html xmlns:o=\"urn:schemas-microsoft-com:office:office\" xmlns:w=\"urn:schemas-microsoft-com:office:word\"><head><meta charset=\"utf-8\"><style>body{font-family:'Times New Roman';font-size:13pt}</style></head><body>"+h+"</body></html>"],{type:"application/msword"});
- const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=(w=="ĐỀ THI"?"De_thi_":"Huong_dan_")+(cur+1)+".doc";a.click()}
+function svgPng(svg){return new Promise((ok,no)=>{const im=new Image();im.onload=()=>{const w=im.width||400,h=im.height||320,c=document.createElement("canvas");c.width=w*2;c.height=h*2;const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);ok({b64:c.toDataURL("image/png").split(",")[1],w,h})};im.onerror=no;im.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg)})}
+async function exp(w){const t=parse(R[cur].raw)[w]||"",ims=[];let h=esc(t).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
+ if(w==="ĐỀ THI"){const L=figList(),ps=[];let i=0;h=h.replace(/\[HÌNH\s*([^:\]]*):\s*([^\]]+)\]/g,()=>{const k=i++,sv=L[k]&&FIG[L[k].id];ps.push(sv?svgPng(sv).catch(()=>null):null);return "@@FIG"+k+"@@"});
+  const rs=await Promise.all(ps);h=h.replace(/@@FIG(\d+)@@/g,(m,k)=>{const r=rs[+k];if(!r)return"";ims.push(r);const W=Math.min(r.w,340);return `<br><img src="file:///hinh${ims.length}.png" width="${W}" height="${Math.round(r.h*W/r.w)}"><br>`})}
+ h=h.split("\n").map(l=>`<p style="margin:3pt 0">${l||"&nbsp;"}</p>`).join("");
+ const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><style>body{font-family:'Times New Roman';font-size:13pt}</style></head><body>${h}</body></html>`;
+ const b64=s=>{let r="";new TextEncoder().encode(s).forEach(c=>r+=String.fromCharCode(c));return btoa(r)},wr=s=>s.replace(/.{1,76}/g,"$&\r\n");
+ let m=`MIME-Version: 1.0\r\nContent-Type: multipart/related; boundary="BND"; type="text/html"\r\n\r\n--BND\r\nContent-Type: text/html; charset="utf-8"\r\nContent-Transfer-Encoding: base64\r\nContent-Location: file:///doc.htm\r\n\r\n${wr(b64(html))}\r\n`;
+ ims.forEach((r,i)=>{m+=`--BND\r\nContent-Type: image/png\r\nContent-Transfer-Encoding: base64\r\nContent-Location: file:///hinh${i+1}.png\r\n\r\n${wr(r.b64)}\r\n`});m+="--BND--\r\n";
+ const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([m],{type:"application/msword"}));a.download=(w=="ĐỀ THI"?"De_thi_":"Huong_dan_")+(cur+1)+".doc";a.click()}
 const FIG={};
 const SYSF="Bạn là chuyên gia vẽ hình Toán THCS bằng SVG, vẽ chính xác tuyệt đối về hình học. Quy trình bắt buộc: (1) chọn hệ toạ độ và TÍNH toạ độ chính xác của mọi điểm (điểm trên đường tròn dùng cos/sin; vuông góc, trung điểm, chân đường cao, tiếp tuyến... phải thoả đúng điều kiện đề bài); (2) vẽ. Phong cách sách giáo khoa: nền trắng, nét đen mảnh, đường phụ/khuất nét đứt, nhãn điểm chữ in nghiêng đặt sát điểm và không đè lên nét, không tô màu, font Times New Roman, viewBox 0 0 400 320 (hoặc tỉ lệ phù hợp). Chỉ trả về MỘT thẻ <svg>...</svg>, không giải thích, không markdown.";
-function figList(){const t=parse(R[cur]?R[cur].raw:"")["ĐỀ THI"]||"";return[...t.matchAll(/\[HÌNH\s*([^:\]]*):\s*([^\]]+)\]/g)].map(m=>({id:cur+"_"+m[1].trim(),n:m[1].trim(),d:m[2].trim()}))}
+function figList(e=cur){const t=parse(R[e]?R[e].raw:"")["ĐỀ THI"]||"";return[...t.matchAll(/\[HÌNH\s*([^:\]]*):\s*([^\]]+)\]/g)].map(m=>({id:e+"_"+m[1].trim(),n:m[1].trim(),d:m[2].trim()}))}
 function cleanSvg(s){const m=s.match(/<svg[\s\S]*<\/svg>/i);if(!m)throw new Error("AI không trả về hình SVG hợp lệ, hãy bấm Vẽ lại.");const doc=new DOMParser().parseFromString(m[0],"image/svg+xml");if(doc.querySelector("parsererror"))throw new Error("SVG bị lỗi cú pháp, hãy bấm Vẽ lại.");const r=doc.documentElement;
  r.querySelectorAll("script,foreignObject").forEach(x=>x.remove());doc.querySelectorAll("*").forEach(e=>[...e.attributes].forEach(a=>{if(/^on/i.test(a.name))e.removeAttribute(a.name)}));
  r.setAttribute("xmlns","http://www.w3.org/2000/svg");const vb=(r.getAttribute("viewBox")||"0 0 400 320").split(/[\s,]+/).map(Number);if(!r.getAttribute("width")){r.setAttribute("width",vb[2]||400);r.setAttribute("height",vb[3]||320)}return new XMLSerializer().serializeToString(r)}
-function figs(){const el=$("figs");if(!el)return;const L=view==="ĐỀ THI"?figList():[];if(!L.length){el.innerHTML="";return}
- el.innerHTML=`<div class="fig"><div class="row" style="align-items:center"><b>🖼 Hình vẽ minh hoạ (${L.length})</b><button class="btn" onclick="figAll()">🎨 Vẽ tất cả hình</button></div><p class="hint">Hình do AI tính toạ độ rồi vẽ bằng SVG. Hãy đối chiếu với đề; nếu lệch, bấm “Vẽ lại”. Tải PNG để chèn vào Word.</p>`+L.map((f,i)=>`<div class="fc"><b>HÌNH ${esc(f.n)}</b> <span class="hint">${esc(f.d)}</span><div>${FIG[f.id]||""}</div><div class="row" style="margin-top:6px"><button class="btn sec" onclick="figGen(${i})">${FIG[f.id]?"🔄 Vẽ lại":"🎨 Vẽ hình"}</button>${FIG[f.id]?`<button class="btn sec" onclick="figSave(${i},'svg')">⬇ SVG</button><button class="btn sec" onclick="figSave(${i},'png')">⬇ PNG</button>`:""}</div><div id="fs_${i}" class="hint"></div></div>`).join("")+"</div>"}
-async function figGen(i,quiet){const f=figList()[i],s=$("fs_"+i);if(!f)return;s.textContent="⏳ Đang vẽ...";let raw="";
- try{ctl=new AbortController();await call([{type:"text",text:`ĐỀ THI (để hiểu ngữ cảnh):\n${parse(R[cur].raw)["ĐỀ THI"]}\n\nHãy vẽ HÌNH ${f.n}: ${f.d}`}],d=>{raw+=d},ctl.signal,false,SYSF);FIG[f.id]=cleanSvg(raw);figs()}
- catch(e){s.textContent="✖ "+e.message;if(quiet)throw e}}
-async function figAll(){const n=figList().length;for(let i=0;i<n;i++){try{await figGen(i,1)}catch(e){break}}}
+async function figGen(i,quiet,e=cur){const f=figList(e)[i];if(!f)return;const st=t=>{const x=$("fs_"+i);if(x&&e===cur)x.textContent=t};st("⏳ Đang vẽ...");let raw="";
+ try{if(!quiet)ctl=new AbortController();await call([{type:"text",text:`ĐỀ THI (để hiểu ngữ cảnh):\n${parse(R[e].raw)["ĐỀ THI"]}\n\nHãy vẽ HÌNH ${f.n}: ${f.d}`}],d=>{raw+=d},ctl.signal,false,SYSF);FIG[f.id]=cleanSvg(raw);if(e===cur)show()}
+ catch(x){st("✖ "+x.message);if(quiet)throw x}}
+async function figAll(e=cur){const n=figList(e).length;for(let i=0;i<n;i++){try{await figGen(i,1,e)}catch(x){if(x.name==="AbortError")throw x;break}}}
 function figSave(i,t){const f=figList()[i],svg=FIG[f.id],n="Hinh_"+f.n.replace(/\W+/g,"_");
  const dl=(b,e)=>{const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=n+"."+e;a.click()};
  if(t==="svg")return dl(new Blob([svg],{type:"image/svg+xml"}),"svg");
@@ -161,7 +168,7 @@ $("go").onclick=async()=>{$("err").innerHTML="";
  if(!has("mt")&&!has("dt"))return $("err").innerHTML='<div class="err">Chưa có ma trận hoặc đặc tả. Hãy tải lên (PDF, Word hoặc ảnh) hoặc dán nội dung trước khi tạo đề.</div>';
  if($("src").value==="1"&&!has("mh")&&!has("bt"))return $("err").innerHTML='<div class="err">Nguồn “từ tài liệu đưa lên” cần đề minh hoạ hoặc tài liệu bài tập. Hãy tải thêm hoặc chọn nguồn Internet.</div>';
  const n=+$("num").value,web=$("src").value!=="1";R=[];cur=0;view="ĐỀ THI";ctl=new AbortController();$("go").disabled=true;$("go").textContent="⏳ Đang tạo đề...";$("stop").style.display="";let tm=0;
- try{for(let k=1;k<=n;k++){R.push({raw:""});cur=k-1;frame();await call(build(k,n),d=>{R[k-1].raw+=d;if(Date.now()-tm>600){tm=Date.now();show()}},ctl.signal,web,SYS);show()}}
+ try{for(let k=1;k<=n;k++){R.push({raw:""});cur=k-1;frame();await call(build(k,n),d=>{R[k-1].raw+=d;if(Date.now()-tm>600){tm=Date.now();show()}},ctl.signal,web,SYS);show();$("go").textContent="⏳ Đang vẽ hình...";await figAll(k-1);$("go").textContent="⏳ Đang tạo đề..."}}
  catch(e){if(e.name!=="AbortError")$("err").innerHTML=`<div class="err">${e.message}</div>`}
  $("go").disabled=false;$("go").textContent="✨ Tạo đề";$("stop").style.display="none";if(R.length)frame()};
 </script></body></html>
