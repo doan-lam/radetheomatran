@@ -170,16 +170,27 @@ async function call(content,on,sig){saveP();const p=CFG.prov,m=$('model').value.
   if(web)b.tools=[{type:'web_search_20250305',name:'web_search',max_uses:6}];
   r=await J('https://api.anthropic.com/v1/messages',{'x-api-key':k,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},b);await chk(r);
   await sse(r,j=>{if(j.type==='content_block_delta'&&j.delta.type==='text_delta')on(j.delta.text);if(j.type==='error')throw new Error(j.error.message)})}
- else if(p==='gemini'){const cand=[m,...PV.gemini.m.filter(x=>x!==m)].slice(0,4);let got=false;
-  const b={systemInstruction:{parts:[{text:SYS}]},contents:[{role:'user',parts:content.map(c=>c.type==='text'?{text:c.text}:{inlineData:{mimeType:c.source.media_type,data:c.source.data}})}],generationConfig:{maxOutputTokens:16000}};
-  if(web)b.tools=[{google_search:{}}];
-  for(let i=0;i<cand.length&&i<5;i++){const mm=cand[i];
-   try{r=await J(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(mm)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(k)}`,{},b);
-    if(!r.ok)throw new Error('Lỗi API '+r.status+' (mô hình '+mm+'): '+(await r.text()).slice(0,500));
-    await sse(r,j=>{if(j.error)throw new Error(j.error.message);for(const q of(j.candidates?.[0]?.content?.parts||[]))if(q.text&&!q.thought){got=true;on(q.text)}});
-    if(mm!==m){$('model').value=mm;saveP()}if(mm!==m)$('err').innerHTML=`<div class="err" style="background:#fff1e0;color:#7a3f0c">Mô hình ${m} bị lỗi nên trang đã tự chuyển sang <b>${mm}</b>.</div>`;
-    return}
-   catch(e){const sg=/use models\/([\w.\-]+)/.exec(e.message||'');if(sg&&!cand.includes(sg[1]))cand.splice(i+1,0,sg[1]);if(got||e.name==='AbortError'||i>=Math.min(cand.length,5)-1)throw e}}}
+ else if(p==='gemini'){const cand=[m,...PV.gemini.m.filter(x=>x!==m)].slice(0,6);let got=false,lastE=null,noWeb=false;
+  const mk=w=>{const b={systemInstruction:{parts:[{text:SYS}]},contents:[{role:'user',parts:content.map(c=>c.type==='text'?{text:c.text}:{inlineData:{mimeType:c.source.media_type,data:c.source.data}})}],generationConfig:{maxOutputTokens:16000}};if(w)b.tools=[{google_search:{}}];return b};
+  const note=t=>$('err').innerHTML=`<div class="err" style="background:#fff1e0;color:#7a3f0c">${t}</div>`;
+  const wait=(s,mm)=>new Promise((res,rej)=>{let n=Math.ceil(s);const sh=()=>note(`⏳ Mô hình <b>${mm}</b> đang bị giới hạn tốc độ (429). Tự thử lại sau ${n}s...`);sh();
+   const iv=setInterval(()=>{if(sig&&sig.aborted){clearInterval(iv);return rej(new DOMException('Aborted','AbortError'))}n--;if(n<=0){clearInterval(iv);$('err').innerHTML='';res()}else sh()},1000)});
+  const rdel=t=>{const x=/"retryDelay"\s*:\s*"([\d.]+)s"/.exec(t||'')||/retry in ([\d.]+)s/i.exec(t||'');return x?parseFloat(x[1]):null};
+  for(let i=0;i<cand.length;i++){const mm=cand[i];
+   for(let t=0;t<3;t++){
+    try{r=await J(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(mm)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(k)}`,{},mk(web&&!noWeb));
+     if(!r.ok){const tx=await r.text();const er=new Error('Lỗi API '+r.status+' (mô hình '+mm+'): '+tx.slice(0,500));er.status=r.status;er.body=tx;throw er}
+     await sse(r,j=>{if(j.error){const er=new Error(j.error.message);er.status=j.error.code;er.body=JSON.stringify(j.error);throw er}for(const q of(j.candidates?.[0]?.content?.parts||[]))if(q.text&&!q.thought){got=true;on(q.text)}});
+     if(mm!==m){$('model').value=mm;saveP();note(`Mô hình ${m} bị lỗi/hết hạn mức nên trang đã tự chuyển sang <b>${mm}</b>.`)}else if(noWeb)note('Hạn mức tìm kiếm Google đã hết nên lần này đề được tạo <b>không dùng tìm kiếm Internet</b>.');else $('err').innerHTML='';
+     return}
+    catch(e){lastE=e;if(got||e.name==='AbortError')throw e;
+     if(e.status===429){const d=rdel(e.body),daily=/PerDay|per_day|"limit":\s*0/i.test(e.body||'');
+      if(!daily&&d!==null&&d<=65&&t<2){await wait(d+1,mm);continue}
+      if(web&&!noWeb&&/search|ground/i.test(e.body||'')){noWeb=true;t--;continue}
+      break}
+     const sg=/use models\/([\w.\-]+)/.exec(e.message||'');if(sg&&!cand.includes(sg[1]))cand.splice(i+1,0,sg[1]);break}}}
+  if(lastE&&lastE.status===429)lastE.message+='<br><br>👉 Đã thử '+cand.length+' mô hình nhưng key Gemini đều hết hạn mức (quota). Cách xử lý: (1) đợi 1–2 phút rồi bấm Tạo đề lại (nếu hết theo phút), hoặc đợi sang ngày mới (nếu hết theo ngày); (2) giảm số đề tạo một lần, tắt "vẽ hình", chọn nguồn "chỉ ngân hàng câu hỏi" (không dùng tìm kiếm Internet) và tải ít tệp/ảnh hơn; (3) chọn mô hình gemini-2.5-flash-lite (hạn mức rộng hơn); (4) bật thanh toán (billing) cho key tại ai.studio hoặc dùng API key của dự án khác; (5) đổi sang AI khác trong mục Cài đặt (OpenRouter, DeepSeek...).';
+  throw lastE}
  else{const base=$('burl').value.trim().replace(/\/$/,'');if(!base)throw new Error('Vui lòng nhập Base URL.');
   const mm=(p==='openrouter'&&web&&!/:online$/.test(m))?m+':online':m;
   const parts=content.map(c=>c.type==='text'?{type:'text',text:c.text}:c.type==='image'?{type:'image_url',image_url:{url:`data:${c.source.media_type};base64,${c.source.data}`}}:{type:'file',file:{filename:'tailieu.pdf',file_data:`data:application/pdf;base64,${c.source.data}`}});
