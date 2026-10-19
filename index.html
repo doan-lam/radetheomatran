@@ -186,10 +186,20 @@ async function call(content,on,sig){saveP();const p=CFG.prov,m=$('model').value.
     catch(e){lastE=e;if(got||e.name==='AbortError')throw e;
      if(e.status===429){const d=rdel(e.body),daily=/PerDay|per_day|"limit":\s*0/i.test(e.body||'');
       if(!daily&&d!==null&&d<=65&&t<2){await wait(d+1,mm);continue}
-      if(web&&!noWeb&&/search|ground/i.test(e.body||'')){noWeb=true;t--;continue}
+      if(web&&!noWeb){noWeb=true;t--;continue}
       break}
      const sg=/use models\/([\w.\-]+)/.exec(e.message||'');if(sg&&!cand.includes(sg[1]))cand.splice(i+1,0,sg[1]);break}}}
-  if(lastE&&lastE.status===429)lastE.message+='<br><br>👉 Đã thử '+cand.length+' mô hình nhưng key Gemini đều hết hạn mức (quota). Cách xử lý: (1) đợi 1–2 phút rồi bấm Tạo đề lại (nếu hết theo phút), hoặc đợi sang ngày mới (nếu hết theo ngày); (2) giảm số đề tạo một lần, tắt "vẽ hình", chọn nguồn "chỉ ngân hàng câu hỏi" (không dùng tìm kiếm Internet) và tải ít tệp/ảnh hơn; (3) chọn mô hình gemini-2.5-flash-lite (hạn mức rộng hơn); (4) bật thanh toán (billing) cho key tại ai.studio hoặc dùng API key của dự án khác; (5) đổi sang AI khác trong mục Cài đặt (OpenRouter, DeepSeek...).';
+  if(lastE&&lastE.status===429){let vio=[],raw=lastE.body||'',nt='';
+   try{const j=JSON.parse(raw);for(const d of(j.error?.details||[]))for(const v of(d.violations||[]))vio.push(v)}catch(_){}
+   try{const rc=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cand[0])}:countTokens?key=${encodeURIComponent(k)}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({generateContentRequest:Object.assign({model:'models/'+cand[0]},mk(false))})});
+    if(rc.ok){const n=(await rc.json()).totalTokens;nt=`<br>📏 Nội dung gửi đi khoảng <b>${n.toLocaleString('vi-VN')} token</b>${n>200000?' — QUÁ LỚN so với giới hạn token/phút của gói miễn phí (thường 250.000), hãy tải ít/nhỏ tệp hơn (đặc biệt PDF nhiều trang, ảnh lớn).':'.'}`}}catch(_){}
+   const ms=vio.map(v=>(v.quotaMetric||'')+' | '+(v.quotaId||'')).join('\n');
+   let why='Chưa xác định được hạn mức nào hết.';
+   if(/input_token/i.test(ms))why='Hết hạn mức <b>token đầu vào</b> (gửi quá nhiều chữ/ảnh/PDF trong 1 phút) — nguyên nhân do <b>kích thước đề gửi lên</b>, không phải do key.';
+   else if(/ground|search/i.test(ms))why='Hết hạn mức <b>tìm kiếm Google (grounding)</b>.';
+   else if(/PerDay/i.test(ms))why='Hết hạn mức <b>số lượt gọi trong ngày</b> của mô hình này với gói hiện tại.';
+   else if(/PerMinute|per_minute/i.test(ms))why='Hết hạn mức <b>số lượt gọi trong phút</b>.';
+   lastE.message=`<b>Gemini trả lỗi 429 (hết hạn mức) ở tất cả ${cand.length} mô hình đã thử, kể cả khi đã tắt tìm kiếm Google.</b><br>${why}${nt}<br><br>👉 Cách xử lý: giảm số đề mỗi lần xuống 1, tắt “vẽ hình”, tải ít tệp/ít trang hơn (cắt PDF chỉ giữ trang cần), chọn mô hình <b>gemini-2.5-flash-lite</b> hoặc <b>gemini-2.5-flash</b>, hoặc bật thanh toán cho key trên ai.studio; hoặc dùng AI khác trong mục Cài đặt.<br><br><small style="white-space:pre-wrap">Chi tiết kỹ thuật:\n${ms||raw.slice(0,600)}</small>`}
   throw lastE}
  else{const base=$('burl').value.trim().replace(/\/$/,'');if(!base)throw new Error('Vui lòng nhập Base URL.');
   const mm=(p==='openrouter'&&web&&!/:online$/.test(m))?m+':online':m;
